@@ -4,13 +4,13 @@ Onboarding repo teaching MuJoCo through three tasks: `task1` scene construction,
 `task2` imitation learning (behavior cloning), `task3` reinforcement learning.
 `task0` is optional XML/kinematic-tree background.
 
-**Current work: task 2.** Steps 1–4 are done, committed and verified locally.
-Everything is pushed to the user's fork and the Colab run is set up.
+**Current work: task 2.** All seven steps are done and run end to end locally
+with the IK expert. `ONBOARDING_REPORT.html` at the repo root is the written
+deliverable (self-contained, images embedded).
 
-> **You are waiting on the user.** They are running the notebook in Colab to do
-> step 5 (collect the dataset) with the real mplib planner. Nothing here is
-> blocked on code — see "Where things stand" below for the three answers to
-> expect and what to do with each. Do not redo steps 1–4.
+> **Still open:** the user intends to re-run steps 5–7 in Colab with the real
+> mplib planner, which has never been executed. See "Where things stand".
+> Everything local is finished; do not redo it.
 
 ---
 
@@ -71,10 +71,11 @@ Quaternions are MuJoCo's `[w, x, y, z]`. All pose accessors are world-frame.
 
 ---
 
-## Three fixes that make the task solvable — do not revert
+## Four fixes that make the task work — do not revert
 
-The repo as shipped could not complete this task. Diagnosed and fixed in
-`572e87e`; each is commented in place.
+The repo as shipped could not complete this task, and could not score it
+honestly either. Fixes 1–3 are in `572e87e`, fix 4 came later; each is
+commented in place.
 
 1. **Cube was 10 cm.** `size` is a *half*-size and was `0.05`. Too wide for the
    8 cm gripper and the 9 cm bin interior. Now `0.02`.
@@ -92,10 +93,28 @@ The repo as shipped could not complete this task. Diagnosed and fixed in
    lift. Raised to `kp=500` (~10 N), with `gainprm` rescaled to `0.0784313725` so
    the ctrl 0–255 → width 0–0.04 m remap is unchanged. **0/7 → 7/7 lifts.**
 
-Things that looked like the cause but were **not**, all tested and left alone:
-solver `iterations=3` (an MJX-style setting), `impratio`, elliptic friction cone,
-fingertip pad friction/`condim`, and ramping the gripper closed. None were
-needed once the stiffness was right.
+4. **The solver was loose enough to score failures as successes.** The scene
+   shipped with `iterations="3" ls_iterations="5"` — an MJX-style setting for
+   GPU batch training. On CPU that is too few to resolve contacts for a fast
+   object: a cube knocked across the table at 4.5 m/s passes **through** the
+   1 cm bin wall and lands inside, so `terminated` fires on a failed episode.
+   This produced a bogus 5% policy success rate. Raised to `100/50`; the solver
+   converges early, so it costs no measurable wall time (0.28 s/episode either
+   way) and the expert is still 200/200.
+
+   Found only because the metrics contradicted each other — "never lifts the
+   cube" and "finishes the job 5% of the time" cannot both be true. Replaying
+   that episode showed the cube peaked at 0.800 m against a 0.82 m rim.
+
+Things that looked like the cause of the **grasp** failure but were not, all
+tested and left alone: `impratio`, elliptic friction cone, fingertip pad
+friction/`condim`, and ramping the gripper closed. None were needed once the
+stiffness was right.
+
+Note the subtlety on solver iterations: raising them does **not** fix grasping
+(tested, no effect — fix 3 is what matters there), but it is required for
+contact integrity at speed. Both things are true; do not read the grasp result
+as a reason to put it back to 3.
 
 ---
 
@@ -146,7 +165,7 @@ backend is slower; time 20 episodes before scaling up.
 
 ## Remaining plan
 
-### Step 5 — collect the dataset (user is running this now, in Colab)
+### Steps 5–7 — done locally, still unrun with mplib
 
 Cell 21 is ready: `EPISODES = 20` as a smoke test, `cube_xy_noise=0.02`.
 
@@ -155,8 +174,19 @@ and the dataset carries no information. And the cell shipped at `EPISODES =
 10_000`, which is hours of planning for a first run — raise it to a few hundred
 only after 20 succeed and one trajectory has been eyeballed.
 
-Measured locally with the IK backend: 20/20 success, 11,120 `(obs, action)`
-pairs, ~556 steps per trajectory.
+Measured locally with the IK backend: 200/200 success, 111,200 pairs at 200
+episodes, ~556 steps per trajectory, 0.28 s/episode.
+
+**Final local results** (200 episodes, 100 epochs, ~95 s training, corrected
+physics): training loss -0.115 -> -37.3. Held-out copying error **0.4%** of a
+typical movement (retrained on 160 episodes, tested on 40 unseen — so it
+generalises, it has not memorised). Closed-loop: grips **35%**, lifts >=1 cm
+**25%**, clears the bin rim **0%**, finishes **0%**. Best lift 37 mm against
+the 60 mm needed.
+
+The open-loop/closed-loop gap is the expected behavior-cloning failure, not a
+pipeline bug: per-step error ~0.5 mm against a grasp clearance under 0.5 mm.
+Do not "fix" this by hunting for a training bug.
 
 ### Step 6 — dataset + network (cells 23, 25)
 

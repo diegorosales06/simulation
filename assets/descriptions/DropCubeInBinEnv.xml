@@ -1,7 +1,15 @@
 <mujoco model="cube in bin scene">
    <compiler angle="radian" autolimits="true"/>
 
-   <option iterations="3" ls_iterations="5" solver="Newton" tolerance="1e-8" timestep="0.001">
+   <!--
+     iterations/ls_iterations were 3/5, an MJX-style setting for GPU batch
+     training. On CPU they are too few to resolve contacts for a fast-moving
+     object: a cube knocked across the table at ~4.5 m/s passes straight
+     through the 1 cm bin wall and registers as a successful drop. That turns
+     evaluation into nonsense, since a failed episode can score as a success.
+     The solver converges early here, so raising the caps costs no wall time.
+   -->
+   <option iterations="100" ls_iterations="50" solver="Newton" tolerance="1e-8" timestep="0.001">
      <flag eulerdamp="disable"/>
    </option>
 
