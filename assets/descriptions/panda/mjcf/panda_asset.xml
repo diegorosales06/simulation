@@ -93,8 +93,15 @@
       <default class="visual">
         <geom type="mesh" contype="0" conaffinity="0" group="2"/>
       </default>
+      <!--
+        contype/conaffinity are 0 on the parent "panda" class, which switches off
+        collision for every geom on the arm - including the fingertip pads, so the
+        gripper cannot grip anything. Turn them back on for collision geoms only;
+        visual geoms stay non-colliding via the "visual" class above. This matches
+        upstream MuJoCo Menagerie, where the 0s sit on "visual" rather than here.
+      -->
       <default class="collision">
-        <geom type="mesh" group="3"/>
+        <geom type="mesh" group="3" contype="1" conaffinity="1"/>
         <default class="fingertip_pad_collision_1">
           <geom type="box" size="0.0085 0.004 0.0085" pos="0 0.0055 0.0445"/>
         </default>
@@ -141,9 +148,18 @@
     <general class="panda" name="actuator6" joint="joint6" gainprm="2000" biasprm="0 -2000 -200" forcerange="-12 12"
       ctrlrange="-0.0175 3.7525"/>
     <general class="panda" name="actuator7" joint="joint7" gainprm="2000" biasprm="0 -2000 -200" forcerange="-12 12"/>
-    <!-- Remap original ctrlrange (0, 0.04) to (0, 255): 0.04 * 100 / 255 = 0.01568627451 -->
+    <!--
+      Gripper. biasprm's second term is the servo stiffness kp, and the squeeze
+      force is kp * (commanded width - actual width). At the original kp=100 a
+      fully-closed command against a 4 cm cube produces only ~2 N, which is not
+      enough to hold it: the pads make intermittent one-sided contact and the cube
+      slides out during the lift. kp=500 gives ~10 N and grasps reliably.
+
+      gainprm keeps the ctrlrange (0, 255) -> width (0, 0.04) remap intact:
+      gain = kp * 0.04 / 255 = 500 * 0.04 / 255 = 0.0784313725
+    -->
     <general class="panda" name="actuator8" tendon="split" forcerange="-100 100" ctrlrange="0 255"
-      gainprm="0.01568627451 0 0" biasprm="0 -100 -10"/>
+      gainprm="0.0784313725 0 0" biasprm="0 -500 -50"/>
   </actuator>
 
   

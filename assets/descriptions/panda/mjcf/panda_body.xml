@@ -94,6 +94,13 @@
                     <geom mesh="link7_c" class="collision"/>
                     <body name="hand" pos="0 0 0.107" quat="0.9238795 0 0 -0.3826834">
                       <inertial mass="0.73" pos="-0.01 0 0.03" diaginertia="0.001 0.0025 0.0017"/>
+                      <!--
+                        Tool center point: the grasp point midway between the fingers.
+                        Mirrors the panda_hand_tcp frame in panda/urdf/panda.urdf, which is
+                        offset 0.1034 m along the hand's local z axis. Read it in Python with
+                        data.site_xpos[id] / data.site_xmat[id] (site, not body).
+                      -->
+                      <site name="panda_hand_tcp" pos="0 0 0.1034" size="0.003" rgba="1 0 0 0.4"/>
                       <geom mesh="hand_0" material="off_white" class="visual"/>
                       <geom mesh="hand_1" material="black" class="visual"/>
                       <geom mesh="hand_2" material="black" class="visual"/>

@@ -7,24 +7,77 @@
 
   <!-- Assets -->
   <include file="simpleTable/simpleTable_asset.xml"/>
+  <include file="panda/mjcf/panda_asset.xml"/>
+  <include file="bin/bin_asset.xml"/>
 
   <!-- Scene -->
   <include file="scene.xml"/> 
 
-  
+  <!-- Enlarge the offscreen buffer so render() can go above the 640x480 default -->
+  <visual>
+    <global offwidth="1280" offheight="960"/>
+  </visual>
+
+  <asset>
+    <material name="cube_mat" rgba="0.05 0.35 0.85 1" specular="0.3" shininess="0.4"/>
+  </asset>
+
   <!-- Scene Objects -->
   <worldbody>
-    <camera name="fixed" pos="0 0 5" quat="1 0 0 0" fovy="45"/>
+    <!--
+      Viewpoint: in front of the table (-y), raised and tilted down ~30 deg.
+      xyaxes = camera right vector, then camera up vector.
+    -->
+    <camera name="fixed" pos="0 -1.85 1.85" xyaxes="1 0 0  0 0.5 0.866" fovy="45"/>
 
- 
-
-    <!-- Table -->
+    <!-- Table: top surface sits at z = 0.735 + 0.025 = 0.76 -->
     <include file="simpleTable/simpleWoodTable_body.xml"/>
 
-   
+    <!--
+      Panda arm. panda_body.xml declares <body name="link0"> with no pos,
+      so it is wrapped here to mount the base on the table surface.
+    -->
+    <body name="panda_mount" pos="-0.35 0 0.76">
+      <include file="panda/mjcf/panda_body.xml"/>
+    </body>
+
+    <!--
+      Bin: the floor plate is size .05 .05 .005 centred on the body origin,
+      so the body is raised by that 0.005 half-thickness to sit flush.
+    -->
+    <body name="bin_mount" pos="0.05 -0.2 0.765">
+      <include file="bin/bin_body.xml"/>
+      <!--
+        Drop target. The bin's inner floor is at the body origin and the walls
+        (half-thickness .005, inner face at +-0.045) are 0.06 tall, so this site
+        sits in the middle of the opening. Use it as the release pose and as the
+        reference point for the `terminated` check.
+      -->
+      <site name="bin_center" pos="0 0 0.03" size="0.004" rgba="0 1 0 0.4"/>
+    </body>
+
+    <!--
+      Cube: `size` is a HALF-size, so 0.02 is a 4 cm cube. It has to clear two
+      limits: the Panda gripper opens 8 cm (0.04 per finger) and the bin interior
+      is 9 cm wide. Its centre rests one half-size above the table: 0.76 + 0.02.
+      This pos must stay in sync with the cube block of the "home" keyframe below;
+      the keyframe is what reset() actually applies.
+    -->
+    <body name="cube" pos="0.05 0.2 0.78">
+      <freejoint name="cube_free"/>
+      <geom name="cube_geom" type="box" size="0.02 0.02 0.02"
+            material="cube_mat" mass="0.05" friction="1 0.05 0.001"/>
+    </body>
   </worldbody>
 
+  <!--
+    qpos must be exactly nq long: 7 arm joints + 2 fingers + 7 for the
+    cube's free joint (3 position, 4 quaternion) = 16.
+  -->
+  <keyframe>
+    <key name="home"
+         qpos="0 0.392699 0 -1.9635 0 2.35619 0.785398 0.04 0.04
+               0.05 0.2 0.78 1 0 0 0"/>
+  </keyframe>
 
-
- 
 </mujoco>
