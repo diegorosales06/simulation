@@ -4,8 +4,13 @@ Onboarding repo teaching MuJoCo through three tasks: `task1` scene construction,
 `task2` imitation learning (behavior cloning), `task3` reinforcement learning.
 `task0` is optional XML/kinematic-tree background.
 
-**Current work: task 2.** Steps 1–4 of the plan below are done, committed and
-verified. Steps 5–7 are not started.
+**Current work: task 2.** Steps 1–4 are done, committed and verified locally.
+Everything is pushed to the user's fork and the Colab run is set up.
+
+> **You are waiting on the user.** They are running the notebook in Colab to do
+> step 5 (collect the dataset) with the real mplib planner. Nothing here is
+> blocked on code — see "Where things stand" below for the three answers to
+> expect and what to do with each. Do not redo steps 1–4.
 
 ---
 
@@ -105,7 +110,7 @@ Cell indices are stable; patch it with `json` rather than by hand.
 | 8 | **the real `TrajEnv`** — accessors, `is_grasped`, `terminated`, `reset_model` | done |
 | 15 | mplib planner setup, guarded import | done |
 | 17 | `pick_cube_solution` expert + demo runner | done |
-| 21 | dataset collection loop | wired up; `EPISODES` still 10_000 |
+| 21 | dataset collection loop | done; `EPISODES = 20`, `cube_xy_noise=0.02` |
 | 23 | `TrajectoryDataset` | **stub — step 6** |
 | 25 | `Actor` network | **stub — step 6** |
 | 27 | `eval_policy` (provided, do not rewrite) | — |
@@ -133,21 +138,25 @@ until the TCP is within 2 mm — without it the arm misses the cube entirely.
 each pair is the state the expert saw when it chose that action. It reads state
 off `env.unwrapped` because `RecordVideo` may wrap the env.
 
-Measured locally with the IK backend: **10/10 success** at `cube_xy_noise=0.02`,
-~556 steps/episode, **0.28 s/episode** (1000 episodes ≈ 5 min).
+Measured locally with the IK backend: **20/20 success** at `cube_xy_noise=0.02`,
+~556 steps/episode, **0.28 s/episode** (1000 episodes ≈ 5 min). The mplib
+backend is slower; time 20 episodes before scaling up.
 
 ---
 
 ## Remaining plan
 
-### Step 5 — collect the dataset (blocked on the fork, below)
+### Step 5 — collect the dataset (user is running this now, in Colab)
 
-Drop `EPISODES` in cell 21 from 10_000 to ~20 first, confirm the pickle is
-non-empty and one trajectory looks sane, then scale to a few hundred.
+Cell 21 is ready: `EPISODES = 20` as a smoke test, `cube_xy_noise=0.02`.
 
-Cell 21 already passes `cube_xy_noise=0.02`. **Keep it.** At the default `0.0`
-every episode replays the identical layout and the dataset carries no
-information — 10_000 byte-identical trajectories.
+**Keep both.** At `cube_xy_noise=0.0` every episode replays the identical layout
+and the dataset carries no information. And the cell shipped at `EPISODES =
+10_000`, which is hours of planning for a first run — raise it to a few hundred
+only after 20 succeed and one trajectory has been eyeballed.
+
+Measured locally with the IK backend: 20/20 success, 11,120 `(obs, action)`
+pairs, ~556 steps per trajectory.
 
 ### Step 6 — dataset + network (cells 23, 25)
 
@@ -178,25 +187,70 @@ covariate shift, plus demonstrations that are not a smooth function of state.
 
 - **Steps 5–7 run in Colab with mplib**, not locally with the IK fallback. The
   user chose this; local collection is faster but bypasses the course's intent.
-- **Work is committed** as it completes (`572e87e`, `2cccdc1`).
+- **Work is committed as it completes.** Do not leave a dirty tree.
 - `task1/visualize.py` has unrelated uncommitted edits by the user — leave them.
+- `.DS_Store` is untracked and should stay that way.
 
-## Blocking the Colab run
+## Git layout — read before pushing anything
 
-`ml_onboarding` is the **course's shared branch**; do not push to it. Fixes 2
-and 3 above live in `assets/descriptions/panda/mjcf/`, so uploading only the
-scene XML to Colab silently restores the unsolvable scene. The user must fork,
-push, and set `REPO_URL` in cell 2.
+| Remote | Points at | Push? |
+|---|---|---|
+| `origin` | `triton-droids/simulation` | **No.** `ml_onboarding` is the course's shared branch, used by every other onboarding member. |
+| `fork` | `diegorosales06/simulation` | Yes. This is where Colab clones from. |
 
-Open questions for the user's first Colab run:
-1. Did `pip install mplib` succeed, and on which Python version (needs ≤3.12)?
-2. Planner demo success rate?
-3. Is `result["position"]` from `plan_screw` shaped `(T, 7)` or `(T, 9)`? The
-   code slices `[:, :7]` to tolerate both, but this is unverified.
+Commits on `ml_onboarding`, oldest first (`b6c05b4` is the last upstream commit):
 
-**The mplib branch has never been executed.** Everything else here was run and
-measured locally. If it misbehaves, set `planner = None` to fall back to IK —
-the same episode should succeed, which isolates planner bugs from scene bugs.
+```
+572e87e  scene physics fixes + env logic + expert policy   (steps 1-4)
+2cccdc1  Colab setup cells actually set up Colab
+3d9bb66  this file
+b6726d9  EPISODES 10_000 -> 20
+235c86b  REPO_URL -> the fork
+```
+
+Local and `fork/ml_onboarding` are both at `235c86b`. Local is 5 ahead of
+`origin/ml_onboarding`, which is correct and should stay that way.
+
+**After any change the Colab run depends on, push to `fork`** — Colab clones
+from GitHub, so an uncommitted local edit is invisible to it.
+
+## Where things stand
+
+The fork is created, everything is pushed, and `REPO_URL` in cell 2 points at
+it. The user is running this notebook:
+
+```
+https://colab.research.google.com/github/diegorosales06/simulation/blob/ml_onboarding/task2/imitation_learning.ipynb
+```
+
+Instructions given: run cells in order, **stop after cell 21**, because 23/25/28
+are still stubs that raise `NotImplementedError`.
+
+Verified by fetching raw files back from the fork — the fixes really are there:
+`gainprm="0.0784313725" biasprm="0 -500 -50"`, `contype="1" conaffinity="1"` on
+the collision class, `size="0.02 0.02 0.02"`, and the `panda_hand_tcp` site.
+
+### Three answers to expect, and what each means
+
+1. **Python version + did mplib install?** Needs ≤3.12; Colab is on 3.12. On
+   3.13+ there is no wheel and the source build fails — then the realistic
+   options are the IK backend or an older Colab runtime.
+2. **Cell 17's success rate.** The go/no-go. If it is poor, have them set
+   `planner = None` and re-run: IK gets 20/20 here, so IK-succeeds-mplib-fails
+   isolates the planner integration from the scene.
+3. **Shape of `result["position"]` from `plan_screw`** — `(T, 7)` or `(T, 9)`.
+   `plan_waypoints` slices `[:, :7]` to tolerate both; this is the single
+   unverified assumption in the mplib path.
+
+**The mplib branch has never been executed.** Everything else in this file was
+run and measured locally. Treat cell 17 as a real checkpoint.
+
+### Offered and not yet answered
+
+Writing Parts 2–4 (steps 6–7: `TrajectoryDataset`, `Actor`, training loop) ahead
+of the user's Colab results, so one session covers steps 5–7 instead of three
+round-trips. It cannot be run locally — no torch, no dataset — so it would be
+untested either way. The user has not said yes or no.
 
 ---
 
